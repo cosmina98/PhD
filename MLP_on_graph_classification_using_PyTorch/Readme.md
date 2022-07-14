@@ -1,1 +1,1 @@
-MLP in Pythorch on graphs
+MLP in Pythorch introductory commits
