@@ -1,7 +1,10 @@
 class Trainer():
     def __init__ (self):
        
-      self.batch_size=85
+      self.batch_size=2000
+      self.epochs=2
+      #used for label count 
+      self.num_classes=0
       self.verbose=True
         
       self.loss_function = nn.CrossEntropyLoss()
@@ -22,8 +25,9 @@ class Trainer():
       self.eps=1e-8
       self.amsgrad=False
 
-      self.mlp=MLP()
+      self.mlp=self.MLP()
       self.optimiser=None
+
     class MLP(nn.Module):
       '''
         Multilayer Perceptron.
@@ -60,25 +64,103 @@ class Trainer():
 
 
     def get_params(self): #get parameters
-       return  (self.optimiser.state_dict(), self.mlp.state_dict)
+       if (self.optimiser != None) :
+         return  (self.props(),self.optimiser.state_dict(), self.mlp.state_dict)
+       else: return self.mlp.state_dict() 
+  
+    def fit(self,trainloader):
+        for epoch in range(self.epochs):  # loop over the dataset 2 times
 
-    def fit(self):
-        pass
-    def partial_fit(X, y): #Update the model with a single iteration over the given data.
-        pass
+          running_loss =self.running_loss
+          for i, data in enumerate(trainloader, 0):
+          # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+             
+            # zero the parameter gradients
+            self.optimiser.zero_grad()
 
-    def predict(X): #Predict using the multi-layer perceptron classifier.
-        pass 
+            # forward + compute loss+ backward + optimize
+            outputs = self.mlp(inputs)
+            loss = self.loss_function(outputs, labels)
+            loss.backward()
+            self.optimiser.step()
+            # print statistics
+            running_loss += loss.item()
+            if i % self.batch_size == 1999:    # print every 2000 mini-batches
+                if self.verbose==True:
+                  print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / self.batch_size:.3f}')
+                running_loss = 0.0
 
-    def predict_log_proba(X):  #	Return the log of probability estimates.
-        pass 
 
-    def  predict_proba(X):	#Probability estimates.
-        pass 
+    def predict(self,testloader): #Predict using the multi-layer perceptron classifier.
+      prediction_list=[]
+      # again no gradients needed
+      with torch.no_grad():
+          for data in testloader:
+              images, labels = data
+              outputs = self.mlp(images)
+              estimation, predictions = torch.max(outputs, 1)
+              prediction_list.append(predictions)
+      return prediction_list #torch.stack(prediction_list)
 
 
-    def score(X, y): #Return the mean accuracy on the given test data and labels.
-        pass 
-    def set_params(**params): #sets parameters
-        pass
+    def predict_log_proba(self,loader):  #	Return the log of probability estimates.
+        y_prob=self.predict_proba(loader)
+        log_proba=np.log(y_prob)
+        return log_proba
+ 
+
+    def predict_proba(self,loader):	#Probability estimates.
+      probabilities_list=[]
+      # again no gradients needed
+      with torch.no_grad():
+          for data in loader:
+              images, labels = data
+              outputs = self.mlp(images)
+              estimation, predictions = torch.max(outputs, 1)
+              probabilities_list.append(estimation)
+      return probabilities_list
+      
+
+    def score(self,loader): #Return the mean accuracy on the given test data and labels.
+        prediction_list=[]
+        if self.num_classes==0:
+            classes = ('plane', 'car', 'bird', 'cat',
+                    'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+            # prepare to count predictions for each class
+            correct_pred = {classname: 0 for classname in classes}
+            total_pred = {classname: 0 for classname in classes}
+        #use the class number as key
+        else: 
+            classes=tuple(np.arange(self.num_classes))  
+            correct_pred = {classname: 0 for classname in np.arange(num_classes)}
+            total_pred= {classname: 0 for classname in np.arange(num_classes)}
+
+        # again no gradients needed
+        with torch.no_grad():
+            for data in loader:
+                images, labels = data
+                outputs = self.mlp(images)
+                estimation, predictions = torch.max(outputs, 1)
+                prediction_list.append(predictions)
+                # collect the correct predictions for each class
+                for label, prediction in zip(labels, predictions):
+                    if label == prediction:
+                        correct_pred[classes[label]] += 1
+                    total_pred[classes[label]] += 1
+        accuracies={}
+        # print accuracy for each class
+        for classname, correct_count in correct_pred.items():
+            accuracy = 100 * float(correct_count) / total_pred[classname]
+            accuracies[classname]=accuracy
+            if self.verbose:
+              print(f'Accuracy for class: {classname} is {accuracy:.1f} %')
+        
+
+    def set_params(self, attr, value): #sets parameters
+        setattr(self, attr, value)
+        
+    def props(cls):   
+        return [i for i in cls.__dict__.items() if i[:1] != '_']
+
 
