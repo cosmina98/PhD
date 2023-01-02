@@ -49,7 +49,7 @@ class Classifier(object):
        return self.model.state_dict() 
   
     def fit(self,X,y,eval_set=[]):
-        
+        self.model.train()
         train = [*zip(X,y)]
         trainloader =  torch.utils.data.DataLoader(train,batch_size=self.batch_size, shuffle=False, num_workers=2)
         for epoch in range(self.epochs):  # loop over the dataset 2 times
@@ -75,6 +75,7 @@ class Classifier(object):
                 running_loss = 0.0
 
     def predict(self, X_test): 
+      self.model.eval()
       if isinstance(X_test, (pd.Series, list, np.ndarray)):
         X_test=(torch.tensor(X_test,  requires_grad = False,dtype=torch.float32))
       outputs = self.model(X_test)
@@ -132,7 +133,6 @@ class Classifier(object):
           if self.verbose:
             print(f'Accuracy for class: {classname} is {accuracy:.1f} %')
 
-        
 
     def set_params(self, attr, value): #sets parameters
         setattr(self, attr, value)
